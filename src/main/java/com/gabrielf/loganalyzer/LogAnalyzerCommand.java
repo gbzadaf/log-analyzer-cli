@@ -1,5 +1,7 @@
 package com.gabrielf.loganalyzer;
 
+import com.gabrielf.loganalyzer.export.CsvExporter;
+import com.gabrielf.loganalyzer.export.JsonExporter;
 import com.gabrielf.loganalyzer.model.LogEntry;
 import com.gabrielf.loganalyzer.model.LogReport;
 import com.gabrielf.loganalyzer.parser.LogParser;
@@ -36,6 +38,18 @@ public class LogAnalyzerCommand implements Callable<Integer> {
     )
     private boolean verbose;
 
+    @CommandLine.Option(
+            names = {"-e", "--export"},
+            description = "Formato de exportacao do relatorio: csv ou json."
+    )
+    private String exportFormat;
+
+    @CommandLine.Option(
+            names = {"-o", "--output"},
+            description = "Caminho do arquivo de saida (usado junto com --export)."
+    )
+    private Path outputPath;
+
 
     @Override
     public Integer call() throws Exception {
@@ -61,7 +75,35 @@ public class LogAnalyzerCommand implements Callable<Integer> {
         LogReport report = reportGenerator.generate(entries);
         printReport(report);
 
+        if (exportFormat != null) {
+            return handleExport(report);
+        }
+
         return 0;
+
+    }
+
+    private Integer handleExport(LogReport report) {
+        if (outputPath == null) {
+            System.err.println("Erro: --output e obrigatorio quando --export e usado.");
+            return 1;
+        }
+
+        try {
+            switch (exportFormat.toLowerCase()) {
+                case "csv" -> new CsvExporter().export(report, outputPath);
+                case "json" -> new JsonExporter().export(report, outputPath);
+                default -> {
+                    System.err.println("Erro: formato de exportacao invalido: " + exportFormat + " (use csv ou json)");
+                    return 1;
+                }
+            }
+            System.out.println("Relatorio exportado para: " + outputPath);
+            return 0;
+        } catch (IOException e) {
+            System.err.println("Erro ao exportar relatorio: " + e.getMessage());
+            return 1;
+        }
 
     }
 
